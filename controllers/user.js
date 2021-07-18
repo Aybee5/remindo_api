@@ -1,24 +1,23 @@
 const { user } = require("../models/UserModel");
 const bcrypt = require("bcryptjs");
 
-module.exports.signup = (req, res) => {
-  user
-    .findOne({ email: req.body.email })
-    .then((user) => {
-      if (user)
-        return req
-          .status(409)
-          .json({ status: false, msg: "User with the email already exists" });
-      const userDetail = {
-        name: req.body.name,
-        email: req.body.email,
-        phoneNumber: req.body.phoneNumber,
-      };
-      bcrypt
-        .hash(req.body.password, 10)
-        .then((result) => {
-          return (userDetail.password = result);
-        })
+const addPermission = (db_endpoint, permission) => {
+  const endpoint = `${db_endpoint}/_security`
+  return axios.get(endpoint).then(response => response.data).then(permissions => {
+      permissions.members.roles.push(permission)
+      return axios.put(endpoint, permissions)
+  }).catch(e => {
+      // console.log(e)
+      throw e
+      return e
+  })
+}
+
+module.exports.register = (req, res) => {
+  const payload = req.body
+  payload.userId = payload.userId.toLowerCase()
+  const role = `user_${payload.userId}`
+  
   const user = {
     "_id": `org.couchdb.user:${payload.email}`,
     'type': 'user',
@@ -28,9 +27,31 @@ module.exports.signup = (req, res) => {
     'name': payload.fullName,
     'password': payload.password
   }
-    .catch((err) => {
-      req.status(500).json({ status: false, msg: "An error occured", err });
-    });
+  const db_endpoint = `http://admin:security@localhost:5984`
+  const userDB = new PouchDB(`${db_endpoint}/_users`)
+  const eventsDB = new PouchDB(`${db_endpoint}/user-${payload.userId}-events`)
+  const taskDB = new PouchDB(`${db_endpoint}/user-${payload.userId}-tasks`)
+  const todoDB = new PouchDB(`${db_endpoint}/prefs-${payload.userId}-todos`)
+  const createDbs = []
+  const permissionAction = []
+  userDB.put(user).then(()=>{
+    createDbs.push(eventsDB)
+    createDbs.push(taskDB)
+    createDbs.push(todoDB)
+    return Promise.allSettled(createDbs)
+  }).then((rs)=>{
+    return Promise.allSettled([eventsDB.info(), taskDB.info(), todoDB.info()])
+  }).then((a)=>{
+    console.log('here',a);
+    permissionAction.push(addPermission(`${db_endpoint}/user-${payload.userId}-events`, role))
+    permissionAction.push(addPermission(`${db_endpoint}/user-${payload.userId}-tasks`, role))
+    permissionAction.push(addPermission(`${db_endpoint}/user-${payload.userId}-todos`, role))
+    return Promise.allSettled(permissionAction)
+  }).then(()=>{
+    res.status(201).json({msg: "sucess", user})
+  }).catch(err=>{
+    res.status(400).json({msg: "Error", err})
+  })
 };
 
 module.exports.login = (req, res) => {
