@@ -19,18 +19,15 @@ module.exports.signup = (req, res) => {
         .then((result) => {
           return (userDetail.password = result);
         })
-        .then(() => {
-          return user.save(userDetail);
-        })
-        .then((result) => {
-          req
-            .status(201)
-            .json({ status: true, msg: "User created sucessfully" });
-        })
-        .catch((err) => {
-          req.status(500).json({ status: false, msg: "An error occured", err });
-        });
-    })
+  const user = {
+    "_id": `org.couchdb.user:${payload.email}`,
+    'type': 'user',
+    'roles': [`${role}`],
+    'email': payload.email,
+    'phoneNumber': payload.phoneNumber,
+    'name': payload.fullName,
+    'password': payload.password
+  }
     .catch((err) => {
       req.status(500).json({ status: false, msg: "An error occured", err });
     });
