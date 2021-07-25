@@ -3,6 +3,8 @@ const PouchDB = require('pouchdb');
 const bcrypt = require("bcryptjs");
 const axios =  require('axios')
 
+const db_endpoint = `http://admin:security@localhost:5984`
+
 const addPermission = (db_endpoint, permission) => {
   const endpoint = `${db_endpoint}/_security`
   return axios.get(endpoint).then(response => response.data).then(permissions => {
@@ -25,29 +27,28 @@ module.exports.register = (req, res) => {
     'type': 'user',
     'roles': [`${role}`],
     'email': payload.email,
+    'userId': payload.userId,
+    'name': payload.email,
     'phoneNumber': payload.phoneNumber,
-    'name': payload.fullName,
+    'fullName': payload.fullName,
+    'origin': 'remindo',
+    'canEmail':true,
+    'canSMS': true,
     'password': payload.password
   }
-  const db_endpoint = `http://admin:security@localhost:5984`
+  console.log({user});
   const userDB = new PouchDB(`${db_endpoint}/_users`)
-  const eventsDB = new PouchDB(`${db_endpoint}/user-${payload.userId}-events`)
-  const taskDB = new PouchDB(`${db_endpoint}/user-${payload.userId}-tasks`)
-  const todoDB = new PouchDB(`${db_endpoint}/prefs-${payload.userId}-todos`)
+  const userAgenda = new PouchDB(`${db_endpoint}/user-${payload.userId}-agendas`)
   const createDbs = []
   const permissionAction = []
   userDB.put(user).then(()=>{
-    createDbs.push(eventsDB)
-    createDbs.push(taskDB)
-    createDbs.push(todoDB)
+    createDbs.push(userAgenda)
     return Promise.allSettled(createDbs)
   }).then((rs)=>{
-    return Promise.allSettled([eventsDB.info(), taskDB.info(), todoDB.info()])
+    return userAgenda.info()
   }).then((a)=>{
     console.log('here',a);
-    permissionAction.push(addPermission(`${db_endpoint}/user-${payload.userId}-events`, role))
-    permissionAction.push(addPermission(`${db_endpoint}/user-${payload.userId}-tasks`, role))
-    permissionAction.push(addPermission(`${db_endpoint}/user-${payload.userId}-todos`, role))
+    permissionAction.push(addPermission(`${db_endpoint}/user-${payload.userId}-agendas`, role))
     return Promise.allSettled(permissionAction)
   }).then(()=>{
     res.status(201).json({msg: "sucess", user})
@@ -67,3 +68,13 @@ module.exports.login = (req, res) => {
     });
   });
 };
+
+module.exports.getUser = async (req, res) =>{
+  console.log(`${db_endpoint}/_users/org.couchdb.user:${req.body.username}`);
+  axios.get(`${db_endpoint}/_users/org.couchdb.user:${req.body.username}`).then(result=>{
+    console.log({result});
+    res.status(200).json({user:result.data})
+  }).catch(err=>{
+    console.log({err});
+  })
+}
