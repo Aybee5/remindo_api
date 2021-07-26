@@ -3,7 +3,7 @@ const PouchDB = require('pouchdb');
 const bcrypt = require("bcryptjs");
 const axios =  require('axios')
 
-const db_endpoint = `http://admin:security@localhost:5984`
+const db_endpoint = process.env.COUCH_DB_URL
 
 const addPermission = (db_endpoint, permission) => {
   const endpoint = `${db_endpoint}/_security`
