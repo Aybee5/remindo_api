@@ -35,7 +35,7 @@ async function scheduleEmail(data) {
   agenda.define(data.emailTitle, async (job) => {
     const { to, fullName, title, detail, type } = job.attrs.data;
     if (type === "todo") {
-      job.repeatEvery("0 7 * * 1-7", {
+      job.repeatEvery("0 4 * * 1-7", {
         skipImmediate: true,
       });
       await job.save();
@@ -112,6 +112,39 @@ module.exports.add = async (req, res) => {
     return res
       .status(201)
       .json({ status: true, msg: "agenda created successfully" });
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+//delete agenda controller
+module.exports.update = async (req, res) => {
+  try {
+    //check if eventType is event
+    const eventType = req.body.eventType;
+    if (eventType === "event") {
+      //cancel agenda smsTitle and emailTitle
+      const jobs = [
+        agenda.cancel({name:req.body.smsTitle}),
+        agenda.cancel({name:req.body.emailTitle}),
+      ];
+      const response = await Promise.allSettled(jobs);
+      console.log(response);
+      if (!req.body._deleted) {
+        const re = [scheduleEmail(req.body), scheduleSMS(req.body)];
+        await Promise.allSettled(re);
+      }
+      return res
+        .status(200)
+        .json({ status: true, msg: "agenda updated successfully" });
+    }
+    agenda.cancel({name:req.body.emailTitle});
+    if (!req.body._deleted) {
+      await scheduleEmail(req.body);
+    }
+    return res
+      .status(200)
+      .json({ status: true, msg: "agenda updated successfully" });
   } catch (error) {
     console.log(error);
   }
